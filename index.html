@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101827">
+<title>MP4 + SRT zusammenführen</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color-scheme:dark;background:#101827;color:#f4f7fb}*{box-sizing:border-box}body{margin:0;padding:24px;min-height:100vh;display:grid;place-items:center}.card{width:min(100%,650px);background:#1a2638;border:1px solid #33455d;border-radius:22px;padding:clamp(20px,5vw,36px);box-shadow:0 16px 60px #0005}h1{font-size:clamp(1.5rem,5vw,2.1rem);margin:0 0 10px}p{color:#bdcadb;line-height:1.55}label{display:block;margin:23px 0 8px;font-weight:650}input[type=file]{display:block;width:100%;padding:14px;border:1px dashed #7895b7;border-radius:12px;background:#111e30;color:#fff}input::file-selector-button,button,.download{border:0;border-radius:9px;padding:10px 14px;background:#70c7fb;color:#092039;font-weight:700;cursor:pointer;margin-right:10px}button:disabled{opacity:.5;cursor:not-allowed}small{color:#aabbd0;line-height:1.5;display:block;margin-top:9px}.status{padding:15px;border-radius:11px;background:#101e31;margin-top:20px;min-height:52px;white-space:pre-wrap;overflow-wrap:anywhere}progress{width:100%;height:13px;margin:15px 0}.actions{margin:18px 0}.download{display:inline-block;text-decoration:none;background:#8fe0a3}a{color:#9ad7ff}footer{margin-top:25px;font-size:.88rem;color:#aabbd0}code{color:#b4e5ff}
+</style>
+</head>
+<body><main class="card">
+<h1>MP4 + SRT zusammenführen</h1>
+<p>Wähle beide Dateien aus. Die Verarbeitung startet automatisch im Browser – kostenlos, ohne Anmeldung und ohne Video-Upload.</p>
+<label for="video">1. MP4-Video</label><input id="video" type="file" accept="video/mp4,.mp4">
+<label for="subs">2. Untertiteldatei (.srt)</label><input id="subs" type="file" accept=".srt,application/x-subrip,text/plain">
+<small>Ergebnis: MP4 mit zuschaltbarer Untertitelspur. Im Player ggf. „CC“/Untertitel aktivieren. Die Videospur bleibt unverändert; es wird nichts ins Bild eingebrannt.</small>
+<div id="status" class="status" role="status" aria-live="polite">Bereit. Bitte MP4 und SRT auswählen.</div>
+<progress id="progress" max="100" value="0" hidden></progress>
+<div class="actions"><button id="retry" type="button" hidden>Erneut starten</button><a id="download" class="download" hidden>Fertige MP4 herunterladen</a></div>
+<footer>Für kleinere Dateien empfohlen: FFmpeg benötigt im Browser zusätzlichen Arbeitsspeicher. Die FFmpeg-Engine (~30 MB) wird beim ersten Start über ein CDN geladen. <a href="https://github.com/basecore/video-srt-merge">Quellcode auf GitHub</a>.</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.js"></script>
+<script>
+'use strict';
+const video=document.getElementById('video'),subs=document.getElementById('subs'),status=document.getElementById('status'),progress=document.getElementById('progress'),retry=document.getElementById('retry'),download=document.getElementById('download');
+const lib='https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd';
+const core='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd';
+let engine=null,loading=null,busy=false,resultURL=null,lastLog='';
+function say(text){status.textContent=text}
+async function blobURL(url,type){const response=await fetch(url);if(!response.ok)throw new Error('Engine-Download fehlgeschlagen: '+response.status+' '+url);return URL.createObjectURL(new Blob([await response.arrayBuffer()],{type}))}
+async function loadEngine(){
+ if(engine?.loaded)return engine;
+ if(loading)return loading;
+ loading=(async()=>{
+  if(!globalThis.FFmpegWASM?.FFmpeg)throw new Error('FFmpeg-JavaScript konnte nicht geladen werden. Verbindung/CDN prüfen und Seite neu laden.');
+  const ff=new FFmpegWASM.FFmpeg();
+  ff.on('log',({message})=>{if(message)lastLog=message});
+  ff.on('progress',({progress:p})=>{if(Number.isFinite(p)&&p>=0&&p<=1){progress.hidden=false;progress.value=Math.round(p*100)}});
+  const [classWorkerURL,coreURL,wasmURL]=await Promise.all([
+   blobURL(lib+'/814.ffmpeg.js','text/javascript'),
+   blobURL(core+'/ffmpeg-core.js','text/javascript'),
+   blobURL(core+'/ffmpeg-core.wasm','application/wasm')
+  ]);
+  try{await ff.load({classWorkerURL,coreURL,wasmURL});engine=ff;return ff}
+  finally{URL.revokeObjectURL(classWorkerURL);URL.revokeObjectURL(coreURL);URL.revokeObjectURL(wasmURL)}
+ })();
+ try{return await loading}catch(e){loading=null;engine?.terminate();engine=null;throw e}
+}
+async function merge(){
+ if(busy||!video.files[0]||!subs.files[0])return;
+ const movie=video.files[0],caption=subs.files[0];
+ if(!/\.mp4$/i.test(movie.name)||!/\.srt$/i.test(caption.name)){say('Bitte eine MP4-Datei und eine SRT-Datei auswählen.');return}
+ busy=true;video.disabled=true;subs.disabled=true;retry.hidden=true;download.hidden=true;progress.hidden=true;progress.value=0;
+ if(resultURL){URL.revokeObjectURL(resultURL);resultURL=null}
+ let ff=null;
+ try{
+  let text;const bytes=await caption.arrayBuffer();
+  try{text=new TextDecoder('utf-8',{fatal:true}).decode(bytes)}catch{text=new TextDecoder('windows-1252').decode(bytes)}
+  text=text.replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n');
+  if(!/\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,.]\d{3}/.test(text))throw new Error('Die SRT-Datei enthält keine gültigen Zeitstempel.');
+  say('Lade FFmpeg-Engine (beim ersten Mal ca. 30 MB) …');ff=await loadEngine();
+  say('Lese Dateien und füge Untertitel hinzu …');progress.hidden=false;
+  await ff.writeFile('video.mp4',new Uint8Array(await movie.arrayBuffer()));
+  await ff.writeFile('untertitel.srt',new TextEncoder().encode(text));
+  lastLog='';
+  const code=await ff.exec(['-hide_banner','-y','-i','video.mp4','-i','untertitel.srt','-map','0:v:0','-map','0:a?','-map','1:0','-c:v','copy','-c:a','copy','-c:s','mov_text','-metadata:s:s:0','language=deu','-disposition:s:0','default','-movflags','+faststart','fertig.mp4']);
+  if(code!==0)throw new Error('FFmpeg-Fehler (Code '+code+'): '+lastLog);
+  const data=await ff.readFile('fertig.mp4');if(!data.length)throw new Error('Es wurde keine MP4 erzeugt.');
+  resultURL=URL.createObjectURL(new Blob([data],{type:'video/mp4'}));
+  download.href=resultURL;download.download=movie.name.replace(/\.mp4$/i,'')+'-mit-untertiteln.mp4';download.hidden=false;
+  progress.value=100;say('Fertig! Die MP4 enthält eine zuschaltbare Untertitelspur. Jetzt herunterladen.');
+ }catch(error){console.error(error);say('Fehler: '+(error?.message||String(error))+'\nBei großen Videos: Browser-Tabs schließen oder eine kleinere Datei verwenden.');retry.hidden=false}
+ finally{if(ff){for(const file of ['video.mp4','untertitel.srt','fertig.mp4']){try{await ff.deleteFile(file)}catch{}}}busy=false;video.disabled=false;subs.disabled=false}
+}
+video.addEventListener('change',merge);subs.addEventListener('change',merge);retry.addEventListener('click',merge);
+</script></body></html>
