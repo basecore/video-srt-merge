@@ -1,61 +1,52 @@
 # Subtitle Studio
 
-Kostenlose, browserbasierte Web-App zum dauerhaften Einbrennen einer SRT-Untertiteldatei in ein MP4-Video. Keine Anmeldung und kein Upload der Videodatei auf einen Server.
+Kostenlose Web-App zum **dauerhaften Einbrennen** von SRT-Untertiteln in MP4-Videos. Das Video wird im Browser verarbeitet; keine Anmeldung und kein Video-Upload auf einen Server.
 
-**Version:** 1.1.0 · **Stand:** 28.09.2026 · **Kontakt:** [basecore@gmx.de](mailto:basecore@gmx.de)
+**Version:** 1.1.1 · **Stand:** 28.09.2026 · **Kontakt:** [basecore@gmx.de](mailto:basecore@gmx.de)
 
-- [Web-App](https://basecore.github.io/video-srt-merge/) (nach Aktivierung von GitHub Pages)
-- [GitHub-Repository](https://github.com/basecore/video-srt-merge)
+[Web-App](https://basecore.github.io/video-srt-merge/) · [Repository](https://github.com/basecore/video-srt-merge) · [Issues](https://github.com/basecore/video-srt-merge/issues)
 
 ## Funktionen
 
-- MP4 und SRT lokal auswählen; nach Auswahl beider Dateien automatischer Start.
-- SRT-Untertitel werden mit FFmpeg/libass in jedes Videobild gerendert (Hardcoding, keine zuschaltbare Spur).
-- MP4-Ausgabe mit H.264-Video und nach Möglichkeit unverändert kopierter Audiospur.
-- Anpassbare Schriftgröße, unterer Abstand, zwei Encoder-Presets, Statusanzeige, Protokoll, Videovorschau und Download.
-- Responsive Oberfläche für Desktop und mobile Browser.
+- MP4 und SRT wählen; die Konvertierung startet automatisch, sobald beide Dateien vorhanden sind.
+- Zeitgesteuerte Live-Vorschau der SRT über dem Originalvideo; Schriftgröße und Abstand live anpassbar. Die Browservorschau ist eine Annäherung an die Ausgabe, keine pixelgenaue FFmpeg-Vorschau.
+- Feste Einblendung per FFmpeg-`subtitles`-Filter und libass. Ausgabe als H.264-MP4 mit nach Möglichkeit kopiertem Audio.
+- Zwei Geschwindigkeitsprofile, Fortschritt, technisches Protokoll, Ausgabevorschau und Download.
+- Responsive Benutzeroberfläche; Version, Datum, GitHub-Link und Kontakt im Footer.
 
 ## Benutzung
 
-1. Die Web-App öffnen.
-2. Optional Schriftgröße, Abstand und Kodierung einstellen.
-3. Eine `.mp4`-Videodatei und eine `.srt`-Datei wählen. Sobald beide vorliegen, startet die Verarbeitung automatisch.
-4. Den Browser-Tab offen lassen und anschließend „MP4 mit eingebrannten Untertiteln herunterladen“ anklicken.
-5. Für geänderte Optionen „Erneut konvertieren“ wählen.
+1. [Web-App](https://basecore.github.io/video-srt-merge/) öffnen und bei Bedarf Schriftgröße, Abstand und Kodiermodus auswählen.
+2. MP4 und SRT laden. In der Live-Vorschau zum gewünschten Zeitpunkt springen und Darstellung überprüfen.
+3. Browser-Tab während der automatischen Konvertierung offen lassen.
+4. Ausgabevorschau prüfen und MP4 herunterladen. Für veränderte Einstellungen „Erneut konvertieren“ wählen.
 
-Der Untertiteltext ist danach dauerhaft sichtbar und lässt sich nicht ausblenden. UTF-8-SRT wird bevorzugt; bei ungültigem UTF-8 versucht die App Windows-1252. Die Ausgabe ist nicht verlustfrei, weil das Bild zur Einblendung neu kodiert werden muss.
+## GitHub Pages
 
-## GitHub Pages veröffentlichen
+Im Repository **Settings → Pages → Build and deployment → Deploy from a branch → main → /(root) → Save** wählen. Die `index.html` liegt im Repository-Root. GitHub Pages muss einmalig aktiviert werden; ein Commit allein schaltet Pages nicht ein.
 
-`index.html` und `README.md` gehören direkt in den Repository-Root. Im Repository unter **Settings → Pages → Build and deployment** die Quelle **Deploy from a branch**, Branch **main**, Ordner **/(root)** auswählen und speichern. Danach lautet die URL `https://basecore.github.io/video-srt-merge/`. Die Pages-Veröffentlichung muss der Eigentümer des Repositorys aktivieren; der Code-Commit allein veröffentlicht keine Webseite.
+## Architektur und Datenschutz
 
-## Technik und Datenschutz
+Die App verwendet die ESM-Variante von `@ffmpeg/ffmpeg` 0.12.15 und den Single-Thread-Core `@ffmpeg/core` 0.12.10. Der ESM-Worker und der ESM-Core werden als Modul geladen; dies ersetzt den fehlerhaften UMD-Worker, der auf GitHub Pages bei `blob:`-Core-URLs `Cannot find module` melden konnte. Der Single-Thread-Core erfordert kein `SharedArrayBuffer`. Die DejaVu-Sans-Schrift kommt ebenfalls über jsDelivr. JavaScript, WebAssembly und Schrift benötigen beim Laden Internetzugriff; ausgewählte MP4 und SRT werden lokal im Browser verarbeitet und nicht auf einen Konvertierungsserver hochgeladen.
 
-Die App ist statisches HTML/CSS/JavaScript und verwendet `@ffmpeg/ffmpeg` 0.12.15 sowie den Single-Thread-Core `@ffmpeg/core` 0.12.10. Der `subtitles`-Filter nutzt libass und eine DejaVu-Sans-TTF-Schriftart. Diese Bibliotheken und die Schrift werden beim ersten Start über jsDelivr geladen. Die ausgewählten Video- und SRT-Dateien verarbeitet FFmpeg.wasm lokal im Browser; sie werden nicht an GitHub oder einen Konvertierungsserver hochgeladen. Für den Download der Bibliotheken/Schrift wird jedoch das CDN kontaktiert.
-
-Der Core wird ohne Multi-Threading geladen und benötigt kein `SharedArrayBuffer`. Das FFmpeg-Verfahren entspricht im Kern:
-
-```bash
-ffmpeg -i input.mp4 -vf "subtitles=captions.srt:fontsdir=fonts" -c:v libx264 -crf 23 -preset ultrafast -pix_fmt yuv420p -c:a copy output.mp4
-```
+FFmpeg rendert den Text per `subtitles=captions.srt:fontsdir=fonts` in jedes Videobild und kodiert das Video neu mit `libx264`. Untertitel sind anschließend nicht mehr abschaltbar. SRT wird als UTF-8 gelesen, bei ungültigem UTF-8 mit Windows-1252-Fallback.
 
 ## Grenzen und Fehlerbehebung
 
-- Neucodierung ist wesentlich langsamer als ein bloßes Zusammenfügen von Dateien. Insbesondere auf Android können große oder lange Videos wegen Browser-RAM und thermischer Drosselung scheitern. Mit einem kurzen MP4 testen.
-- Wenn FFmpeg nicht geladen werden kann: Internetverbindung, CDN-Sperre und Browserkonsole prüfen.
-- Falls eine MP4 eine nicht MP4-kompatible Audiospur enthält, kann `-c:a copy` fehlschlagen; derzeit gibt es keine automatische Audiokonvertierung.
-- Nicht jede Schrift deckt jede Schrift ab; DejaVu Sans unterstützt viele europäische Zeichen, aber keine vollständige CJK-/Emoji-Abdeckung.
-- Eine erfolgreiche Verarbeitung im Zielbrowser ist vor Veröffentlichung mit einem kleinen Testvideo zu prüfen; es gibt keine serverseitigen Tests.
+- Neucodierung ist rechen- und speicherintensiv. Auf Android können große Videos oder lange Filme am RAM scheitern; zuerst mit einem kurzen Clip testen.
+- Wenn Module nicht laden: Browserkonsole, Netzwerkzugang und Blockierung des CDN prüfen; nach Deploy die Seite hart aktualisieren.
+- `-c:a copy` funktioniert nur mit einer MP4-kompatiblen Audiospur; es gibt derzeit keine automatische AAC-Neucodierung.
+- Live-Vorschau und FFmpeg-Ausgabe verwenden unterschiedliche Textrenderer. Für das endgültige Aussehen immer die exportierte MP4 überprüfen.
+- DejaVu Sans deckt nicht alle Schriften und Emoji ab. Es gibt noch keinen automatisierten Browser-End-to-End-Test; der Anwender muss einen kurzen Testexport verifizieren.
 
-## Entwicklung und Releases
-
-Version und Datum werden in `index.html` im Header und Footer sowie hier in der README gepflegt. Änderungen per Commit auf `main` veröffentlichen; die GitHub-Pages-Quelle muss einmalig aktiviert sein.
+## Versionen
 
 | Version | Datum | Änderung |
 | --- | --- | --- |
-| 1.1.0 | 28.09.2026 | Festes Einbrennen der Untertitel, neue Oberfläche, Vorschau und Dokumentation. |
+| 1.1.1 | 28.09.2026 | ESM-Loader statt UMD-Worker; Live-Untertitelvorschau und präzisere Fehlertexte. |
+| 1.1.0 | 28.09.2026 | Fest eingebrannte Untertitel, neue GUI und Dokumentation. |
 | 1.0.0 | 28.09.2026 | Erste Version mit zuschaltbarer Untertitelspur. |
 
 ## Lizenz und Kontakt
 
-Der eigene Projektcode steht unter der [MIT-Lizenz](LICENSE). FFmpeg, FFmpeg.wasm und DejaVu Sans unterliegen ihren jeweils eigenen Lizenzen; die MIT-Lizenz des Projektcodes ersetzt diese nicht. Fragen und Fehlermeldungen: [basecore@gmx.de](mailto:basecore@gmx.de) oder [GitHub Issues](https://github.com/basecore/video-srt-merge/issues).
+Eigener Projektcode: [MIT-Lizenz](LICENSE). FFmpeg/ffmpeg.wasm und DejaVu Sans behalten ihre eigenen Lizenzen. Fehler und Vorschläge über [Issues](https://github.com/basecore/video-srt-merge/issues) oder [basecore@gmx.de](mailto:basecore@gmx.de).
