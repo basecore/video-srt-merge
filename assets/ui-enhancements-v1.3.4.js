@@ -22,14 +22,15 @@ render();preset.value=Object.keys(profiles).find(key=>profiles[key].resolution==
 preset.addEventListener('change',()=>{const profile=profiles[preset.value];if(!profile)return;syncing=true;for(const [id,value] of Object.entries(profile)){const element=$(id);element.value=value;element.dispatchEvent(new Event('input',{bubbles:true}))}syncing=false});
 for(const element of [resolution,quality])element.addEventListener('input',()=>{if(!syncing)preset.value='custom'});
 const defaults={resolution:'original',quality:'23',aacFallback:true,offset:'0',size:'28',margin:'32',position:'2',color:'white',outline:'2'};
-const reset=document.createElement('button');reset.type='button';reset.id='resetDefaults';reset.className='btn';reset.style.background='#d8e8f5';
+const reset=document.createElement('button');reset.type='button';reset.id='resetDefaults';reset.className='btn';reset.style.background='#d8e8f5';reset.style.minWidth='190px';reset.textContent=text('reset');
 const note=[...card.querySelectorAll('p.muted')].pop();if(note)note.before(reset);else card.append(reset);
 const sampleInfo=document.createElement('p');sampleInfo.id='sampleCueInfo';sampleInfo.className='muted';frame.after(sampleInfo);
 function clearOutput(){const preview=$('framePreview');if(preview){if(preview.src.startsWith('blob:'))URL.revokeObjectURL(preview.src);preview.removeAttribute('src');preview.hidden=true}const output=$('outputVideo'),download=$('download');if(download){if(download.href.startsWith('blob:'))URL.revokeObjectURL(download.href);download.removeAttribute('href');download.hidden=true}if(output){output.removeAttribute('src');output.load();output.hidden=true}}
 let index=-1,seeking=false;
 reset.addEventListener('click',()=>{if(!stop.hidden)return;syncing=true;for(const [id,value] of Object.entries(defaults)){const element=$(id);if(!element)continue;if(element.type==='checkbox')element.checked=value;else element.value=value;element.dispatchEvent(new Event('input',{bubbles:true}))}syncing=false;preset.value='original';clearOutput();index=-1;sampleInfo.textContent='';status.textContent=text('resetDone')});
 new MutationObserver(()=>{reset.disabled=!stop.hidden}).observe(stop,{attributes:true,attributeFilter:['hidden']});
-new MutationObserver(render).observe(document.documentElement,{attributes:true,attributeFilter:['lang']});
+new MutationObserver(()=>{render();reset.textContent=text('reset')}).observe(document.documentElement,{attributes:true,attributeFilter:['lang']});
+$('language')?.addEventListener('change',()=>{reset.textContent=text('reset')});
 function seconds(value){const m=value.match(/(\d+):(\d+):(\d+)[,.](\d+)/);return m?+m[1]*3600+ +m[2]*60+ +m[3]+ +m[4]/1000:NaN}
 async function cueTimes(){const data=await subs.files[0].arrayBuffer();let content;try{content=new TextDecoder('utf-8',{fatal:true}).decode(data)}catch{content=new TextDecoder('windows-1252').decode(data)}const offset=Math.max(-10,Math.min(10,(Number($('offset')?.value)||0)/1000));return content.replace(/\r\n?/g,'\n').split(/\n\s*\n/).flatMap(block=>{const m=block.match(/(\d+:\d+:\d+[,.]\d+)\s*-->\s*(\d+:\d+:\d+[,.]\d+)/);if(!m)return[];const start=Math.max(0,seconds(m[1])+offset),end=seconds(m[2])+offset;return end>start?[{start,end}]:[]}).sort((a,b)=>a.start-b.start)}
 const originalClick=frame.onclick;
