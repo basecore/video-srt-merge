@@ -1,55 +1,47 @@
 # Subtitle Studio
 
-Installierbare, kostenlose Browser-App zum dauerhaften Einbrennen von SRT-Untertiteln in MP4-Videos. Video und Untertitel bleiben auf dem Gerät; FFmpeg und Schriftart werden beim Start von einem CDN geladen.
+A free, installable web app that permanently burns SRT subtitles into MP4 video in the browser. No account or video upload to a conversion server.
 
-**Version:** 1.2.0 · **Datum:** 28.09.2026 · **Kontakt:** [basecore@gmx.de](mailto:basecore@gmx.de)
+**Version:** 1.3.0 · **Date:** 29 September 2026 · **Contact:** [basecore@gmx.de](mailto:basecore@gmx.de)
 
-[Web-App](https://basecore.github.io/video-srt-merge/) · [Quellcode](https://github.com/basecore/video-srt-merge) · [Probleme melden](https://github.com/basecore/video-srt-merge/issues)
+[Open the app](https://basecore.github.io/video-srt-merge/) · [Source code](https://github.com/basecore/video-srt-merge) · [Report a problem](https://github.com/basecore/video-srt-merge/issues)
 
-## Funktionsumfang
+## Workflow
 
-- MP4 und SRT auswählen: Der Export startet automatisch, anschließend steht ein MP4-Download mit fest eingebranntem Untertitel bereit.
-- Auflösung Original, maximal 1080p/720p/480p ohne Upscaling; ursprüngliches Seitenverhältnis bleibt erhalten. Ausgabequalität CRF 19/23/27.
-- Schriftgröße, Textfarbe (weiß/gelb), Kontur, oberer oder unterer Randabstand und Position.
-- Zwei Vorschauen: zeitgesteuerte CSS-Live-Anzeige und exaktes FFmpeg-Beispielbild eines Frames mit derselben Auflösung und denselben Filterparametern wie beim Videoexport. Die nachfolgende H.264-Kompression kann die Darstellung geringfügig beeinflussen.
-- Ausgabevideo abspielen und herunterladen, Fortschrittsanzeige und technisches Protokoll.
-- PWA mit Manifest, Service Worker und professionellem SVG-Logo plus PNG-Icons in 192×192, 512×512 und maskierbarem 512×512-Format.
+1. Select an MP4 video and SRT subtitle file. Selection does **not** begin video processing.
+2. Choose resolution (original, up to 1080p/720p/480p), CRF quality, font size, color, position, margin and black outline.
+3. Scrub the fast live preview; optionally click **Render accurate sample frame**. That action renders one image with the same FFmpeg filter chain as the export and may take longer for a late frame.
+4. Click **Burn subtitles & download MP4** below the sample-frame button when ready. After processing, inspect the output and download it. Changing settings hides an outdated sample frame; render it again to see new settings.
 
-## Bedienung
+The language selector defaults to **English**. Choosing **Deutsch** translates the complete interface and status messages and persists the choice locally in the browser. A new browser without a stored choice starts in English. FFmpeg's raw technical log is not translated.
 
-1. [Web-App](https://basecore.github.io/video-srt-merge/) öffnen; optional unter **App installieren** als PWA installieren, falls der Browser den Installationsdialog anbietet.
-2. Auflösung, Qualität und Schriftstil wählen, dann MP4 und SRT auswählen. Der Export startet automatisch.
-3. In der Live-Vorschau zum passenden SRT-Zeitpunkt springen und bei Bedarf **Genaues Beispielbild berechnen** wählen. Für geänderte Einstellungen **Erneut exportieren** klicken.
-4. Ausgabevorschau prüfen und die MP4 herunterladen.
+## Installation
 
-## Veröffentlichung und Icons
+The app is a GitHub Pages PWA. In the repository, enable **Settings → Pages → Deploy from a branch → main → /(root)**. Its manifest and service-worker URLs are relative to `/video-srt-merge/` rather than the GitHub domain root. The 192×192, 512×512 and maskable PNG app icons are stored under `icons/`. The **Install app** button appears only when the browser raises `beforeinstallprompt`; use the browser menu on other platforms. The local UI is cached, but loading FFmpeg modules and encoding still require an internet connection.
 
-GitHub Pages: **Settings → Pages → Deploy from a branch → main → /(root) → Save**. Alle PWA-Pfade sind relativ zu `/video-srt-merge/`; das Manifest startet die App mit `./`, nicht mit dem GitHub-Domain-Root.
+The vector logo is at `assets/logo.svg`. GitHub Actions workflow `.github/workflows/build-icons.yml` and `scripts/generate_icons.py` regenerate the PNG icons if the design changes. Verify the `icons/` directory remains present; without valid images, installation can fail in Chromium.
 
-Die SVG-Quelldatei `assets/logo.svg` ist direkt im Repository. Der Workflow `.github/workflows/build-icons.yml` erstellt aus dem Design per Pillow drei echte PNG-Dateien und committet sie auf `main`. Unter **Actions → Build PWA icons** prüfen, ob der Lauf erfolgreich war und die drei Dateien im Ordner `icons/` liegen. Ist Actions deaktiviert oder der Push durch Branch-Schutz blockiert, den Workflow nach Freigabe erneut ausführen oder `python -m pip install Pillow==11.3.0 && python scripts/generate_icons.py` lokal starten und die erzeugten PNGs committen. Ohne PNG-Icons kann die Installation in Chromium scheitern. Die Installieren-Schaltfläche erscheint nur, wenn der Browser `beforeinstallprompt` auslöst; sonst über das Browsermenü installieren.
+## Technology and privacy
 
-## Technisches Konzept
+The single-threaded FFmpeg.wasm core (`@ffmpeg/ffmpeg` 0.12.15 / `@ffmpeg/core` 0.12.10) loads from jsDelivr. DejaVu Sans is loaded from the same CDN. The SRT is rendered with libass and the output video is encoded as H.264; compatible audio is stream-copied. MP4 and SRT remain on the device. The CSS live preview is approximate; the optional sample frame uses FFmpeg, the selected scale and exact subtitle filter. H.264 compression may introduce minor differences from its PNG preview.
 
-GitHub Pages liefert statische HTML/CSS/JS-Dateien. `@ffmpeg/ffmpeg` 0.12.15 und der Single-Thread-Core `@ffmpeg/core` 0.12.10 werden über jsDelivr geladen; DejaVu Sans 2.37.3 liefert die Schrift. FFmpeg rendert SRT per libass in das Videobild und codiert mit H.264 neu. Die Vorschau eines Standbilds verwendet exakt dieselbe FFmpeg-Filterkette wie der Export (Skalierung vor Untertiteln). Die CSS-Live-Vorschau dient nur dem schnellen Sichten der Zeitstempel. Die Audiospur wird kopiert, sofern MP4-kompatibel.
+## Limits and troubleshooting
 
-Die PWA speichert die lokale Oberfläche zwischen, aber nicht den rund 30 MB großen FFmpeg-Core oder private Videos. Für Verarbeitung und erneutes Laden der CDN-Module ist weiterhin Internet erforderlich. Video und SRT werden nicht an einen Konvertierungsserver hochgeladen.
+- Long/high-resolution videos can exceed browser memory, particularly on Android. Test with a short video first.
+- Non-MP4-compatible audio can make `-c:a copy` fail. There is no automatic audio re-encode yet.
+- If the installed app shows an old version, reload it and check the service worker. The external FFmpeg files are not precached.
+- The browser has not been automatically end-to-end tested against all video codecs or platforms; validate the result with the output player and technical log.
 
-## Grenzen und Fehlerbehebung
+## Releases
 
-- Mobilgeräte können bei langen oder hochauflösenden Videos an RAM-Grenzen stoßen. Ein exaktes Beispielbild eines späten Zeitpunkts kann wegen der Frame-Suche länger dauern.
-- Nicht jede Eingabe-MP4 besitzt Browser-abspielbare Codecs oder eine MP4-kompatible Audiospur. Im letzteren Fall kann `-c:a copy` scheitern.
-- FFmpeg-Filter können durch einzelne Browser oder CDN-Ladefehler ausfallen. Dann das technische Protokoll und die Browserkonsole prüfen, CDN-Freigabe testen und mit einem kurzen Clip erneut versuchen.
-- Vor produktiver Nutzung sind PWA-Installation und der vollständige Export im Zielbrowser zu prüfen; ein automatisierter Browser-End-to-End-Test ist noch nicht vorhanden.
-
-## Versionsverlauf
-
-| Version | Datum | Änderung |
+| Version | Date | Changes |
 | --- | --- | --- |
-| 1.2.0 | 28.09.2026 | PWA, Logo/Icon-Erzeugung, Auflösungs-/Stiloptionen und FFmpeg-Frame-Vorschau. |
-| 1.1.1 | 28.09.2026 | ESM-Loader und Live-Vorschau. |
-| 1.1.0 | 28.09.2026 | Fest eingebrannte Untertitel und neue Oberfläche. |
-| 1.0.0 | 28.09.2026 | MP4 mit zuschaltbarer Untertitelspur. |
+| 1.3.0 | 2026-09-29 | Manual export below sample preview; default English plus persistent German switch. |
+| 1.2.0 | 2026-09-28 | PWA, icon pipeline, scaling and accurate FFmpeg sample frame. |
+| 1.1.1 | 2026-09-28 | ESM loader and timed SRT live preview. |
+| 1.1.0 | 2026-09-28 | Burned-in subtitles and revised interface. |
+| 1.0.0 | 2026-09-28 | Selectable subtitle track. |
 
-## Lizenz und Kontakt
+## License
 
-Eigener Projektcode: [MIT](LICENSE). FFmpeg/ffmpeg.wasm und DejaVu Sans besitzen eigene Lizenzen. Kontakt: [basecore@gmx.de](mailto:basecore@gmx.de).
+The app's own code is [MIT licensed](LICENSE). FFmpeg, FFmpeg.wasm and DejaVu Sans retain their own licenses.
